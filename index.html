@@ -467,6 +467,16 @@
       <button class="btn-spin" id="spinBtn" disabled>SPIN!</button>
     </div>
 
+    <div class="settings">
+      <label>Wheel size:
+        <input type="range" id="wheelSizeSlider" min="50" max="140" value="100">
+        <span id="wheelSizeValue">100%</span>
+      </label>
+      <button class="btn-load" id="mediaBtn">🎬 Add GIF/MP4</button>
+      <input type="file" id="mediaInput" accept=".gif,video/mp4" multiple hidden>
+    </div>
+    <div id="mediaLayer" style="position:fixed;inset:0;pointer-events:none;z-index:20;"></div>
+
     <div class="wheel-wrapper">
       <canvas id="wheel" width="540" height="540"></canvas>
       <svg class="pointer" width="40" height="30" viewBox="0 0 40 30">
@@ -539,6 +549,8 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<button id="showListBtn" class="btn-toggle-list fixed" style="display:none">☰ List</button>
+
 
 <script>
 (function() {
@@ -571,6 +583,10 @@
   var exampleBtn = document.getElementById('exampleBtn');
   var exampleOverlay = document.getElementById('exampleOverlay');
   var closeExampleBtn = document.getElementById('closeExample');
+  var showListBtn = document.getElementById('showListBtn');
+  var wheelScale = 1;
+  var mediaItems = [];
+
 
   var STORAGE_KEY = 'wheel-of-random-state';
 
@@ -600,7 +616,9 @@
       allItems: state.allItems,
       removed: Object.keys(state.removed).map(Number),
       rotation: state.rotation,
-      spinDuration: state.spinDuration
+      spinDuration: state.spinDuration,
+      wheelScale: wheelScale,
+      mediaItems: mediaItems
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -617,6 +635,8 @@
       (data.removed || []).forEach(function(i) { state.removed[i] = true; });
       state.rotation = data.rotation || 0;
       state.spinDuration = data.spinDuration || 5000;
+      wheelScale = data.wheelScale || 1;
+      mediaItems = data.mediaItems || [];
       durationInput.value = state.spinDuration;
       return state.allItems.length > 0;
     } catch(e) { return false; }
@@ -629,7 +649,7 @@
     } else {
       maxSize = Math.min(window.innerWidth - 380, window.innerHeight - 320, 540);
     }
-    var size = Math.max(200, maxSize);
+    var size = Math.max(200, maxSize) * wheelScale;
     canvas.style.width = size + 'px';
     canvas.style.height = size + 'px';
     canvas.width = size * (window.devicePixelRatio || 1);
@@ -961,12 +981,38 @@
     state.removed = {};
     state.rotation = 0;
     state.spinDuration = data.spinDuration || 5000;
+      wheelScale = data.wheelScale || 1;
+      mediaItems = data.mediaItems || [];
     durationInput.value = state.spinDuration;
     saveState();
     draw();
     updateStats();
     renderList();
     showToast('Loaded ' + state.allItems.length + ' games');
+  }
+
+
+  function renderMediaItems(){
+    var layer=document.getElementById('mediaLayer');
+    layer.innerHTML='';
+    mediaItems.forEach(function(m,i){
+      var el=document.createElement(m.type==='video'?'video':'img');
+      if(m.type==='video'){el.src=m.src;el.autoplay=true;el.loop=true;el.muted=true;}
+      else el.src=m.src;
+      el.style.cssText='position:absolute;left:'+m.x+'px;top:'+m.y+'px;width:'+m.w+'px;height:'+m.h+'px;object-fit:contain;pointer-events:auto;cursor:move;border:1px solid #666;';
+      let dragging=false,ox=0,oy=0;
+      el.addEventListener('mousedown',function(e){dragging=true;ox=e.clientX-m.x;oy=e.clientY-m.y;});
+      window.addEventListener('mousemove',function(e){if(!dragging)return;m.x=e.clientX-ox;m.y=e.clientY-oy;el.style.left=m.x+'px';el.style.top=m.y+'px';});
+      window.addEventListener('mouseup',function(){if(dragging){dragging=false;saveState();}});
+      el.addEventListener('wheel',function(e){
+        e.preventDefault();
+        var d=e.deltaY>0?-20:20;
+        m.w=Math.max(80,Math.min(500,m.w+d));
+        m.h=Math.max(80,Math.min(500,m.h+d));
+        el.style.width=m.w+'px';el.style.height=m.h+'px';saveState();
+      });
+      layer.appendChild(el);
+    });
   }
 
   function updateDuration() {
@@ -984,6 +1030,8 @@
   }
   sizeCanvas();
   draw();
+  renderMediaItems();
+  setTimeout(function(){var s=document.getElementById('wheelSizeSlider'); if(s){s.value=Math.round(wheelScale*100); document.getElementById('wheelSizeValue').textContent=s.value+'%';}},0);
 
   var resizeTicking = false;
   window.addEventListener('resize', function() {
@@ -1075,16 +1123,23 @@
   });
 
   toggleListBtn.addEventListener('click', function() {
-    listPanel.classList.toggle('collapsed');
-    if (listPanel.classList.contains('collapsed')) {
-      toggleListBtn.classList.add('fixed');
-      toggleListBtn.innerHTML = '&#9776; List';
-    } else {
-      toggleListBtn.classList.remove('fixed');
-      toggleListBtn.innerHTML = '&#x2715; Hide';
-    }
+    listPanel.classList.add('collapsed');
+    showListBtn.style.display = 'block';
+    localStorage.setItem('wheel-list-collapsed','1');
     sizeCanvas();
   });
+
+  showListBtn.addEventListener('click', function() {
+    listPanel.classList.remove('collapsed');
+    showListBtn.style.display = 'none';
+    localStorage.setItem('wheel-list-collapsed','0');
+    sizeCanvas();
+  });
+
+  if (localStorage.getItem('wheel-list-collapsed') === '1') {
+    listPanel.classList.add('collapsed');
+    showListBtn.style.display = 'block';
+  }
 
   addBtn.addEventListener('click', function() {
     addItem(addNameInput.value, addUrlInput.value);
@@ -1122,6 +1177,30 @@
   exampleBtn.addEventListener('click', function() { exampleOverlay.classList.add('active'); });
   closeExampleBtn.addEventListener('click', function() { exampleOverlay.classList.remove('active'); });
   exampleOverlay.addEventListener('click', function(e) { if (e.target === exampleOverlay) exampleOverlay.classList.remove('active'); });
+
+  document.getElementById('wheelSizeSlider').addEventListener('input',function(){
+    wheelScale=this.value/100;
+    document.getElementById('wheelSizeValue').textContent=this.value+'%';
+    sizeCanvas(); saveState();
+  });
+
+  document.getElementById('mediaBtn').addEventListener('click',function(){document.getElementById('mediaInput').click();});
+  document.getElementById('mediaInput').addEventListener('change',function(e){
+    Array.from(e.target.files).forEach(function(file){
+      var r=new FileReader();
+      r.onload=function(ev){
+        mediaItems.push({
+          type:file.type.includes('mp4')?'video':'gif',
+          src:ev.target.result,
+          x:100+mediaItems.length*20,y:100+mediaItems.length*20,
+          w:180,h:180
+        });
+        renderMediaItems(); saveState();
+      };
+      r.readAsDataURL(file);
+    });
+  });
+
 })();
 </script>
 </body>
