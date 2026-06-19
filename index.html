@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wheel of Random</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    min-height: 100vh;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .layout {
+    display: flex;
+    max-width: 1100px;
+    min-height: 100vh;
+    margin: 0 auto;
+    gap: 0;
+  }
+  .main-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 20px 20px 20px;
+    gap: 16px;
+    min-width: 0;
+  }
+  h1 {
+    font-size: 1.8rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    background: linear-gradient(135deg, #e74c3c, #f39c12, #2ecc71, #3498db);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .settings {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .settings label {
+    font-size: 0.9rem;
+    color: #aaa;
+  }
+  .settings input[type="number"] {
+    width: 80px;
+    padding: 6px 8px;
+    border: 1px solid #444;
+    border-radius: 6px;
+    background: #16213e;
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    text-align: center;
+  }
+  .settings input[type="number"]:focus {
+    outline: none;
+    border-color: #f39c12;
+  }
+  button {
+    padding: 8px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    letter-spacing: 0.5px;
+  }
+  button:active { transform: scale(0.96); }
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .btn-load {
+    background: #16213e;
+    color: #e0e0e0;
+    border: 1px solid #444;
+  }
+  .btn-load:hover:not(:disabled) { background: #1e3050; border-color: #666; }
+  .btn-reset {
+    background: #2d1b3d;
+    color: #c4b5fd;
+    border: 1px solid #6d28d9;
+  }
+  .btn-reset:hover:not(:disabled) { background: #3b2360; }
+  .btn-spin {
+    padding: 12px 40px;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 3px;
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+    text-transform: uppercase;
+  }
+  .btn-spin:hover:not(:disabled) {
+    box-shadow: 0 6px 25px rgba(231, 76, 60, 0.6);
+    transform: translateY(-1px);
+  }
+  .btn-spin:disabled { box-shadow: none; }
+  .btn-remove {
+    background: #2d1b3d;
+    color: #c4b5fd;
+    margin-right: 10px;
+  }
+  .btn-remove:hover { background: #3b2360; }
+  .btn-close {
+    background: #333;
+    color: #ccc;
+  }
+  .btn-close:hover { background: #444; }
+  .wheel-wrapper {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    margin: 10px 0;
+    width: 100%;
+    max-width: 540px;
+  }
+  canvas {
+    display: block;
+    filter: drop-shadow(0 0 20px rgba(0,0,0,0.5));
+  }
+  .pointer {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+  }
+  .stats {
+    font-size: 0.85rem;
+    color: #888;
+    text-align: center;
+  }
+  .stats strong { color: #f39c12; }
+
+  .list-panel {
+    width: 340px;
+    min-width: 340px;
+    max-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #0d1424;
+    border-left: 1px solid #2a3a5c;
+    transition: margin-right 0.3s ease, opacity 0.3s ease;
+  }
+  .list-panel.collapsed {
+    margin-right: -340px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid #1a2744;
+    flex-shrink: 0;
+  }
+  .list-header h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #ccc;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .list-header small { color: #888; font-weight: 400; font-size: 0.8rem; }
+  .btn-toggle-list {
+    background: none;
+    border: 1px solid #444;
+    color: #888;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    border-radius: 6px;
+  }
+  .btn-toggle-list:hover { background: #1a2744; color: #ccc; }
+  .btn-toggle-list.fixed {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 50;
+    background: #0d1424;
+    border: 1px solid #2a3a5c;
+    color: #f39c12;
+  }
+  .add-form {
+    display: flex;
+    gap: 6px;
+    padding: 10px 16px;
+    border-bottom: 1px solid #1a2744;
+    flex-shrink: 0;
+  }
+  .add-form input {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 10px;
+    border: 1px solid #333;
+    border-radius: 6px;
+    background: #16213e;
+    color: #e0e0e0;
+    font-size: 0.82rem;
+  }
+  .add-form input:focus {
+    outline: none;
+    border-color: #2ecc71;
+  }
+  .add-form input::placeholder { color: #555; }
+  .btn-add {
+    background: #1a3a2a;
+    color: #2ecc71;
+    border: 1px solid #2ecc71;
+    padding: 7px 14px;
+    white-space: nowrap;
+  }
+  .btn-add:hover { background: #245c3a; }
+  .items-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  .items-list::-webkit-scrollbar { width: 5px; }
+  .items-list::-webkit-scrollbar-track { background: #0d1424; }
+  .items-list::-webkit-scrollbar-thumb { background: #2a3a5c; border-radius: 3px; }
+  .list-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
+    font-size: 0.82rem;
+    border-bottom: 1px solid #111827;
+    transition: background 0.1s;
+  }
+  .list-item:hover { background: #111d33; }
+  .list-item .name {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .list-item .name.removed {
+    text-decoration: line-through;
+    color: #555;
+  }
+  .list-item .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .list-item .dot.on { background: #2ecc71; }
+  .list-item .dot.off { background: #555; }
+  .list-item .idx {
+    color: #555;
+    font-size: 0.7rem;
+    min-width: 24px;
+  }
+  .btn-item {
+    background: none;
+    border: 1px solid transparent;
+    color: #888;
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .btn-item:hover { color: #fff; border-color: #444; }
+  .btn-item.del { color: #e74c3c; }
+  .btn-item.del:hover { border-color: #e74c3c; background: rgba(231,76,60,0.1); }
+  .btn-item.restore { color: #2ecc71; }
+  .btn-item.restore:hover { border-color: #2ecc71; background: rgba(46,204,113,0.1); }
+  .list-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #444;
+    font-size: 0.85rem;
+    padding: 30px 20px;
+    text-align: center;
+    line-height: 1.6;
+  }
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .overlay.active { opacity: 1; pointer-events: all; }
+  .modal {
+    background: #16213e;
+    border: 1px solid #2a3a5c;
+    border-radius: 16px;
+    padding: 30px 36px;
+    text-align: center;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    transform: translateY(20px);
+    transition: transform 0.3s ease;
+  }
+  .overlay.active .modal { transform: translateY(0); }
+  .modal h2 {
+    font-size: 1.5rem;
+    margin-bottom: 8px;
+    color: #f39c12;
+    word-break: break-word;
+  }
+  .modal a {
+    display: inline-block;
+    color: #3498db;
+    font-size: 0.95rem;
+    margin-bottom: 20px;
+    text-decoration: none;
+    border-bottom: 1px dashed #3498db;
+    transition: color 0.15s;
+  }
+  .modal a:hover { color: #5dade2; }
+  .modal-buttons { display: flex; justify-content: center; gap: 10px; }
+  .help-modal {
+    text-align: left;
+    line-height: 1.8;
+  }
+  .help-modal h2 {
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .help-modal table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .help-modal td {
+    padding: 5px 8px;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #1a2744;
+  }
+  .help-modal td:first-child {
+    color: #f39c12;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-weight: 700;
+    white-space: nowrap;
+    width: 80px;
+  }
+  .example-modal pre {
+    background: #0d1424;
+    border: 1px solid #2a3a5c;
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 0.8rem;
+    font-family: 'Consolas', 'Courier New', monospace;
+    color: #c0c0c0;
+    text-align: left;
+    overflow-x: auto;
+    margin: 12px 0;
+    line-height: 1.5;
+  }
+  .example-modal code .key { color: #f39c12; }
+  .example-modal code .str { color: #2ecc71; }
+  .example-modal code .num { color: #3498db; }
+  .btn-help {
+    background: none;
+    border: 1px solid #444;
+    color: #888;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    border-radius: 6px;
+    font-weight: 700;
+  }
+  .btn-help:hover { background: #1a2744; color: #ccc; }
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #2ecc71;
+    color: #000;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    z-index: 200;
+    transition: transform 0.3s ease;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .drop-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(243, 156, 18, 0.08);
+    border: 3px dashed #f39c12;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .drop-overlay.active { opacity: 1; }
+  .drop-overlay span {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #f39c12;
+    background: rgba(26, 26, 46, 0.9);
+    padding: 20px 40px;
+    border-radius: 12px;
+    border: 2px solid #f39c12;
+  }
+  @media (max-width: 800px) {
+    .layout { flex-direction: column; }
+    .list-panel {
+      width: 100%;
+      min-width: 100%;
+      max-height: 50vh;
+      border-left: none;
+      border-top: 1px solid #2a3a5c;
+    }
+    .list-panel.collapsed {
+      margin-right: 0;
+      margin-bottom: -50vh;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="drop-overlay" id="dropOverlay"><span>&#128229; Drop JSON file here</span></div>
+
+<div class="layout">
+  <div class="main-col">
+    <h1>Wheel of Random</h1>
+
+    <div class="controls">
+      <button class="btn-load" id="loadBtn">&#128193; Load List</button>
+      <input type="file" id="fileInput" accept=".json" hidden>
+      <button class="btn-reset" id="resetBtn" disabled>&#8634; Reset All</button>
+      <button class="btn-help" id="exampleBtn">&#128196; Example JSON</button>
+      <button class="btn-help" id="helpBtn">? Keys</button>
+    </div>
+
+    <div class="settings">
+      <label>Spin time: <input type="number" id="durationInput" value="5000" min="500" max="30000" step="100"> ms</label>
+      <button class="btn-spin" id="spinBtn" disabled>SPIN!</button>
+    </div>
+
+    <div class="wheel-wrapper">
+      <canvas id="wheel" width="540" height="540"></canvas>
+      <svg class="pointer" width="40" height="30" viewBox="0 0 40 30">
+        <polygon points="20,30 2,0 38,0" fill="#e74c3c" stroke="#fff" stroke-width="2"/>
+      </svg>
+    </div>
+
+    <div class="stats" id="stats">No games loaded</div>
+  </div>
+
+  <div class="list-panel" id="listPanel">
+    <div class="list-header">
+      <h3>Games <small id="listCount">0</small></h3>
+      <button class="btn-toggle-list" id="toggleList">&#x2715; Hide</button>
+    </div>
+    <div class="add-form">
+      <input type="text" id="addName" placeholder="Game name...">
+      <input type="text" id="addUrl" placeholder="URL (optional)">
+      <button class="btn-add" id="addBtn">+ Add</button>
+    </div>
+    <div class="items-list" id="itemsList"></div>
+    <div class="list-empty" id="listEmpty">No games yet.<br>Load a JSON file or add manually.</div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="resultName"></h2>
+    <a id="resultLink" href="#" target="_blank" rel="noopener">Open on Steam &#8599;</a>
+    <div class="modal-buttons">
+      <button class="btn-remove" id="removeBtn">Remove from wheel</button>
+      <button class="btn-close" id="closeModal">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="helpOverlay">
+  <div class="modal help-modal">
+    <h2>&#9000; Keyboard Shortcuts</h2>
+    <table>
+      <tr><td>Space</td><td>Spin the wheel</td></tr>
+      <tr><td>Escape</td><td>Close any popup</td></tr>
+      <tr><td>?</td><td>Show this help</td></tr>
+    </table>
+    <div class="modal-buttons" style="margin-top:16px">
+      <button class="btn-close" id="closeHelp">Got it</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="exampleOverlay">
+  <div class="modal example-modal">
+    <h2>&#128196; Expected JSON Format</h2>
+    <pre><code>{
+  <span class="key">"items"</span>: [
+    { <span class="key">"name"</span>: <span class="str">"Game Name"</span>, <span class="key">"url"</span>: <span class="str">"https://store.steampowered.com/app/..."</span> },
+    { <span class="key">"name"</span>: <span class="str">"Another Game"</span>, <span class="key">"url"</span>: <span class="str">"https://..."</span> }
+  ],
+  <span class="key">"spinDuration"</span>: <span class="num">5000</span>
+}</code></pre>
+    <p style="font-size:0.8rem;color:#888;text-align:left;line-height:1.6">
+      <code style="color:#aaa">spinDuration</code> — optional, default 5000 ms.
+      <br><span class="key">url</span> — optional (can be empty string).
+      <br>Only <span class="key">name</span> is required per item.
+    </p>
+    <div class="modal-buttons" style="margin-top:12px">
+      <button class="btn-close" id="closeExample">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+  var canvas = document.getElementById('wheel');
+  var ctx = canvas.getContext('2d');
+  var spinBtn = document.getElementById('spinBtn');
+  var resetBtn = document.getElementById('resetBtn');
+  var loadBtn = document.getElementById('loadBtn');
+  var fileInput = document.getElementById('fileInput');
+  var durationInput = document.getElementById('durationInput');
+  var statsEl = document.getElementById('stats');
+  var overlay = document.getElementById('overlay');
+  var resultNameEl = document.getElementById('resultName');
+  var resultLinkEl = document.getElementById('resultLink');
+  var removeBtn = document.getElementById('removeBtn');
+  var closeModalBtn = document.getElementById('closeModal');
+  var toastEl = document.getElementById('toast');
+  var dropOverlay = document.getElementById('dropOverlay');
+  var listPanel = document.getElementById('listPanel');
+  var toggleListBtn = document.getElementById('toggleList');
+  var itemsListEl = document.getElementById('itemsList');
+  var listEmptyEl = document.getElementById('listEmpty');
+  var listCountEl = document.getElementById('listCount');
+  var addNameInput = document.getElementById('addName');
+  var addUrlInput = document.getElementById('addUrl');
+  var addBtn = document.getElementById('addBtn');
+  var helpBtn = document.getElementById('helpBtn');
+  var helpOverlay = document.getElementById('helpOverlay');
+  var closeHelpBtn = document.getElementById('closeHelp');
+  var exampleBtn = document.getElementById('exampleBtn');
+  var exampleOverlay = document.getElementById('exampleOverlay');
+  var closeExampleBtn = document.getElementById('closeExample');
+
+  var STORAGE_KEY = 'wheel-of-random-state';
+
+  var state = {
+    allItems: [],
+    removed: {},
+    rotation: 0,
+    spinDuration: 5000,
+    isSpinning: false
+  };
+
+  var centerX = 0, centerY = 0, radius = 0;
+  var toastTimer = null;
+
+  function getActiveItems() {
+    var result = [];
+    for (var i = 0; i < state.allItems.length; i++) {
+      if (!state.removed[i]) {
+        result.push({ name: state.allItems[i].name, url: state.allItems[i].url, origIdx: i });
+      }
+    }
+    return result;
+  }
+
+  function saveState() {
+    var data = {
+      allItems: state.allItems,
+      removed: Object.keys(state.removed).map(Number),
+      rotation: state.rotation,
+      spinDuration: state.spinDuration
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch(e) {}
+  }
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      var data = JSON.parse(raw);
+      state.allItems = data.allItems || [];
+      state.removed = {};
+      (data.removed || []).forEach(function(i) { state.removed[i] = true; });
+      state.rotation = data.rotation || 0;
+      state.spinDuration = data.spinDuration || 5000;
+      durationInput.value = state.spinDuration;
+      return state.allItems.length > 0;
+    } catch(e) { return false; }
+  }
+
+  function sizeCanvas() {
+    var maxSize = Math.min(window.innerWidth - 40, window.innerHeight - 320, 540);
+    if (listPanel.classList.contains('collapsed')) {
+      maxSize = Math.min(window.innerWidth - 40, 540);
+    } else {
+      maxSize = Math.min(window.innerWidth - 380, window.innerHeight - 320, 540);
+    }
+    var size = Math.max(200, maxSize);
+    canvas.style.width = size + 'px';
+    canvas.style.height = size + 'px';
+    canvas.width = size * (window.devicePixelRatio || 1);
+    canvas.height = size * (window.devicePixelRatio || 1);
+    ctx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
+    centerX = size / 2;
+    centerY = size / 2;
+    radius = size / 2 - 28;
+    draw();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    var items = getActiveItems();
+    var n = items.length;
+
+    if (n === 0) {
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      var grad = ctx.createRadialGradient(centerX - radius*0.3, centerY - radius*0.3, radius*0.1, centerX, centerY, radius);
+      grad.addColorStop(0, '#2a2a3e');
+      grad.addColorStop(1, '#1a1a2a');
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.strokeStyle = '#444';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      for (var t = 0; t < 24; t++) {
+        var a = t * Math.PI / 12;
+        ctx.beginPath();
+        ctx.moveTo(centerX + Math.cos(a) * (radius - 6), centerY + Math.sin(a) * (radius - 6));
+        ctx.lineTo(centerX + Math.cos(a) * radius, centerY + Math.sin(a) * radius);
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      ctx.font = 'bold 16px system-ui, sans-serif';
+      ctx.fillStyle = '#666';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(state.allItems.length > 0 ? 'All games removed' : 'No games loaded', centerX, centerY);
+      ctx.fillStyle = '#888';
+      ctx.font = '12px system-ui, sans-serif';
+      ctx.fillText('Use "Load List" to upload a .json file', centerX, centerY + 28);
+      return;
+    }
+
+    var segAngle = (Math.PI * 2) / n;
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(state.rotation);
+
+    for (var i = 0; i < n; i++) {
+      var start = i * segAngle;
+      var end = start + segAngle;
+      var hue = ((i * 360 / n) + (i * 17)) % 360;
+      var lit = 40 + ((i % 3) * 8);
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, radius, start, end);
+      ctx.closePath();
+      ctx.fillStyle = 'hsl(' + hue + ', 65%, ' + lit + '%)';
+      ctx.fill();
+      ctx.strokeStyle = '#1a1a2e';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.save();
+      var mid = start + segAngle / 2;
+      ctx.rotate(mid);
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      var fontSize = Math.max(10, Math.min(13, Math.floor(radius * 0.7 / n * 2.5)));
+      ctx.font = 'bold ' + fontSize + 'px system-ui, sans-serif';
+      ctx.fillStyle = '#fff';
+      ctx.shadowColor = 'rgba(0,0,0,0.6)';
+      ctx.shadowBlur = 2;
+
+      var name = items[i].name;
+      var maxW = radius - 22;
+      var metrics = ctx.measureText(name);
+      if (metrics.width > maxW) {
+        while (name.length > 4 && ctx.measureText(name + '..').width > maxW) {
+          name = name.slice(0, -1);
+        }
+        name += '..';
+      }
+      ctx.fillText(name, radius - 12, 0);
+      ctx.restore();
+    }
+
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.12, 0, Math.PI * 2);
+    var hubGrad = ctx.createRadialGradient(-radius*0.03, -radius*0.03, radius*0.02, 0, 0, radius*0.16);
+    hubGrad.addColorStop(0, '#e0e0e0');
+    hubGrad.addColorStop(1, '#333');
+    ctx.fillStyle = hubGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius + 2, 0, Math.PI * 2);
+    ctx.strokeStyle = '#2a3a5c';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius + 6, 0, Math.PI * 2);
+    ctx.strokeStyle = '#1e2d4a';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function spin() {
+    if (state.isSpinning) return;
+    var active = getActiveItems();
+    if (active.length === 0) return;
+
+    state.isSpinning = true;
+    spinBtn.disabled = true;
+    resetBtn.disabled = true;
+    loadBtn.disabled = true;
+    addBtn.disabled = true;
+
+    var duration = state.spinDuration;
+    var fullSpins = (Math.random() * 5 + 5) * Math.PI * 2;
+    var randomOffset = Math.random() * Math.PI * 2;
+    var totalDelta = fullSpins + randomOffset;
+    var startRotation = state.rotation;
+    var startTime = performance.now();
+
+    function animate(now) {
+      var elapsed = now - startTime;
+      var progress = Math.min(elapsed / duration, 1);
+      var eased = 1 - Math.pow(1 - progress, 4);
+
+      state.rotation = (startRotation + totalDelta * eased) % (Math.PI * 2);
+      if (state.rotation < 0) state.rotation += Math.PI * 2;
+      draw();
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        onSpinComplete();
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  function getWinner() {
+    var active = getActiveItems();
+    var n = active.length;
+    if (n === 0) return null;
+
+    var segAngle = (Math.PI * 2) / n;
+    var pointerAngle = (Math.PI * 1.5 - state.rotation) % (Math.PI * 2);
+    if (pointerAngle < 0) pointerAngle += Math.PI * 2;
+    var idx = Math.floor(pointerAngle / segAngle);
+    idx = Math.min(idx, n - 1);
+    return active[idx];
+  }
+
+  function onSpinComplete() {
+    state.isSpinning = false;
+    spinBtn.disabled = false;
+    resetBtn.disabled = false;
+    loadBtn.disabled = false;
+    addBtn.disabled = false;
+    saveState();
+
+    var winner = getWinner();
+    if (!winner) return;
+
+    resultNameEl.textContent = winner.name;
+    resultLinkEl.href = winner.url;
+    resultLinkEl.textContent = 'Open on Steam \u2197';
+    removeBtn.dataset.origIdx = winner.origIdx;
+    overlay.classList.add('active');
+  }
+
+  function removeFromWheel(origIdx) {
+    state.removed[origIdx] = true;
+    var active = getActiveItems();
+    if (active.length === 0) {
+      state.rotation = 0;
+    }
+    saveState();
+    draw();
+    updateStats();
+    renderList();
+    showToast('Removed from wheel');
+  }
+
+  function restoreToWheel(origIdx) {
+    delete state.removed[origIdx];
+    saveState();
+    draw();
+    updateStats();
+    renderList();
+    showToast('Restored to wheel');
+  }
+
+  function deleteItem(origIdx) {
+    var name = state.allItems[origIdx].name;
+    state.allItems.splice(origIdx, 1);
+    var newRemoved = {};
+    Object.keys(state.removed).forEach(function(k) {
+      var ki = Number(k);
+      if (ki > origIdx) newRemoved[ki - 1] = true;
+      else if (ki < origIdx) newRemoved[ki] = true;
+    });
+    state.removed = newRemoved;
+    if (getActiveItems().length === 0) state.rotation = 0;
+    saveState();
+    draw();
+    updateStats();
+    renderList();
+    showToast('Deleted: ' + name);
+  }
+
+  function addItem(name, url) {
+    if (!name.trim()) return;
+    state.allItems.push({ name: name.trim(), url: (url || '').trim() });
+    saveState();
+    draw();
+    updateStats();
+    renderList();
+    addNameInput.value = '';
+    addUrlInput.value = '';
+    showToast('Added: ' + name.trim());
+  }
+
+  function resetAll() {
+    state.removed = {};
+    state.rotation = 0;
+    saveState();
+    draw();
+    updateStats();
+    renderList();
+    showToast('All games restored');
+  }
+
+  function updateStats() {
+    var active = getActiveItems();
+    var total = state.allItems.length;
+    if (total === 0) {
+      statsEl.innerHTML = 'No games loaded';
+      spinBtn.disabled = true;
+      resetBtn.disabled = true;
+      return;
+    }
+    statsEl.innerHTML = '<strong>' + active.length + '</strong> / ' + total + ' games active';
+    spinBtn.disabled = (active.length === 0);
+    resetBtn.disabled = (active.length === total);
+  }
+
+  function renderList() {
+    var total = state.allItems.length;
+    listCountEl.textContent = total;
+
+    if (total === 0) {
+      itemsListEl.innerHTML = '';
+      listEmptyEl.style.display = 'flex';
+      return;
+    }
+    listEmptyEl.style.display = 'none';
+
+    var active = getActiveItems();
+    var segmentAngle = active.length > 0 ? 360 / active.length : 0;
+
+    var html = '';
+    for (var i = 0; i < total; i++) {
+      var item = state.allItems[i];
+      var isRemoved = !!state.removed[i];
+      var hue = ((i * 360 / total) + (i * 17)) % 360;
+      var lit = 40 + ((i % 3) * 8);
+
+      html += '<div class="list-item">';
+      html += '<span class="dot ' + (isRemoved ? 'off' : 'on') + '" style="background:hsl(' + hue + ',65%,' + (isRemoved ? '25%' : lit + '%') + ')"></span>';
+      html += '<span class="idx">' + (i + 1) + '</span>';
+      html += '<span class="name' + (isRemoved ? ' removed' : '') + '" title="' + escAttr(item.url) + '">' + escHtml(item.name) + '</span>';
+      if (isRemoved) {
+        html += '<button class="btn-item restore" data-action="restore" data-idx="' + i + '">&#8634; Restore</button>';
+      } else {
+        html += '<button class="btn-item" data-action="remove-wheel" data-idx="' + i + '">&#8854; Off wheel</button>';
+      }
+      html += '<button class="btn-item del" data-action="delete" data-idx="' + i + '">&#x2715;</button>';
+      html += '</div>';
+    }
+
+    itemsListEl.innerHTML = html;
+  }
+
+  function escHtml(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function escAttr(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function showToast(msg) {
+    if (toastTimer) clearTimeout(toastTimer);
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    toastTimer = setTimeout(function() {
+      toastEl.classList.remove('show');
+      toastTimer = null;
+    }, 2000);
+  }
+
+  function loadJSON(content) {
+    var data;
+    try { data = JSON.parse(content); } catch(e) {
+      showToast('Invalid JSON file');
+      return;
+    }
+    if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
+      showToast('JSON must contain "items" array');
+      return;
+    }
+    state.allItems = data.items.map(function(item) { return { name: item.name || '???', url: item.url || '' }; });
+    state.removed = {};
+    state.rotation = 0;
+    state.spinDuration = data.spinDuration || 5000;
+    durationInput.value = state.spinDuration;
+    saveState();
+    draw();
+    updateStats();
+    renderList();
+    showToast('Loaded ' + state.allItems.length + ' games');
+  }
+
+  function updateDuration() {
+    var v = parseInt(durationInput.value, 10);
+    if (isNaN(v) || v < 500) v = 500;
+    if (v > 30000) v = 30000;
+    state.spinDuration = v;
+    durationInput.value = v;
+    saveState();
+  }
+
+  if (loadState()) {
+    updateStats();
+    renderList();
+  }
+  sizeCanvas();
+  draw();
+
+  var resizeTicking = false;
+  window.addEventListener('resize', function() {
+    if (!resizeTicking) {
+      resizeTicking = true;
+      requestAnimationFrame(function() {
+        sizeCanvas();
+        resizeTicking = false;
+      });
+    }
+  });
+
+  spinBtn.addEventListener('click', spin);
+  resetBtn.addEventListener('click', resetAll);
+
+  loadBtn.addEventListener('click', function() { fileInput.click(); });
+  fileInput.addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) { loadJSON(ev.target.result); };
+    reader.readAsText(file);
+    fileInput.value = '';
+  });
+
+  durationInput.addEventListener('input', updateDuration);
+  durationInput.addEventListener('change', updateDuration);
+
+  removeBtn.addEventListener('click', function() {
+    var idx = parseInt(removeBtn.dataset.origIdx, 10);
+    removeFromWheel(idx);
+    overlay.classList.remove('active');
+  });
+
+  closeModalBtn.addEventListener('click', function() {
+    overlay.classList.remove('active');
+  });
+
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.classList.remove('active');
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      if (overlay.classList.contains('active')) overlay.classList.remove('active');
+      else if (helpOverlay.classList.contains('active')) helpOverlay.classList.remove('active');
+      else if (exampleOverlay.classList.contains('active')) exampleOverlay.classList.remove('active');
+      return;
+    }
+    if (e.key === '?' && !helpOverlay.classList.contains('active')) {
+      e.preventDefault();
+      helpOverlay.classList.add('active');
+      return;
+    }
+    var tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
+    var isInput = tag === 'input' || tag === 'textarea' || tag === 'select' || document.activeElement && document.activeElement.isContentEditable;
+    if (e.key === ' ' && !isInput && !state.isSpinning && getActiveItems().length > 0 && !overlay.classList.contains('active') && !helpOverlay.classList.contains('active') && !exampleOverlay.classList.contains('active')) {
+      e.preventDefault();
+      spin();
+    }
+  });
+
+  var dragCounter = 0;
+  document.addEventListener('dragenter', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    dragCounter++;
+    if (dragCounter === 1) dropOverlay.classList.add('active');
+  });
+  document.addEventListener('dragleave', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    dragCounter--;
+    if (dragCounter === 0) dropOverlay.classList.remove('active');
+  });
+  document.addEventListener('dragover', function(e) {
+    e.preventDefault(); e.stopPropagation();
+  });
+  document.addEventListener('drop', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    dragCounter = 0;
+    dropOverlay.classList.remove('active');
+    var file = e.dataTransfer.files[0];
+    if (!file || !file.name.endsWith('.json')) {
+      showToast('Please drop a .json file');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(ev) { loadJSON(ev.target.result); };
+    reader.readAsText(file);
+  });
+
+  toggleListBtn.addEventListener('click', function() {
+    listPanel.classList.toggle('collapsed');
+    if (listPanel.classList.contains('collapsed')) {
+      toggleListBtn.classList.add('fixed');
+      toggleListBtn.innerHTML = '&#9776; List';
+    } else {
+      toggleListBtn.classList.remove('fixed');
+      toggleListBtn.innerHTML = '&#x2715; Hide';
+    }
+    sizeCanvas();
+  });
+
+  addBtn.addEventListener('click', function() {
+    addItem(addNameInput.value, addUrlInput.value);
+  });
+
+  addNameInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addItem(addNameInput.value, addUrlInput.value);
+    }
+  });
+
+  addUrlInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addItem(addNameInput.value, addUrlInput.value);
+    }
+  });
+
+  itemsListEl.addEventListener('click', function(e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    var idx = parseInt(btn.dataset.idx, 10);
+    if (isNaN(idx)) return;
+    if (action === 'remove-wheel') removeFromWheel(idx);
+    else if (action === 'restore') restoreToWheel(idx);
+    else if (action === 'delete') deleteItem(idx);
+  });
+
+  helpBtn.addEventListener('click', function() { helpOverlay.classList.add('active'); });
+  closeHelpBtn.addEventListener('click', function() { helpOverlay.classList.remove('active'); });
+  helpOverlay.addEventListener('click', function(e) { if (e.target === helpOverlay) helpOverlay.classList.remove('active'); });
+
+  exampleBtn.addEventListener('click', function() { exampleOverlay.classList.add('active'); });
+  closeExampleBtn.addEventListener('click', function() { exampleOverlay.classList.remove('active'); });
+  exampleOverlay.addEventListener('click', function(e) { if (e.target === exampleOverlay) exampleOverlay.classList.remove('active'); });
+})();
+</script>
+</body>
+</html>
